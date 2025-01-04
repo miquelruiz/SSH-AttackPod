@@ -70,9 +70,22 @@ def submit_attack(ip, user, password, evidence, ATTACKPOD_LOCAL_IP):
         except Exception as e:
             logging.error(f"[!] Got an exception while submitting the attack: {e}")
 
+
 def run_sshd():
     while True:
         os.system("/sbin/sshd -D -E /var/log/ssh.log")
+
+
+def reap_children():
+    while True:
+        try:
+            siginfo = os.waitid(os.P_ALL, 0, os.WEXITED|os.WNOHANG)
+        except ChildProcessError:
+            pass
+
+        if siginfo is not None:
+            logging.debug(f"Process {siginfo.si_pid} reaped")
+        time.sleep(1)
 
 
 def rotate_sshd_keys():
@@ -97,6 +110,10 @@ if __name__ == '__main__':
     logging.info("[+] Starting SSHD")
     sshd_thread = threading.Thread(target=run_sshd, args=())
     sshd_thread.start()
+
+    logging.info("[+] Starting child reaper")
+    reaper_thread = threading.Thread(target=reap_children, args=())
+    reaper_thread.start()
 
     with open("/var/log/ssh.log", 'r') as logfile:
         logfile.seek(0, os.SEEK_END)
